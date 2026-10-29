@@ -1,60 +1,50 @@
-name: Build APK
+import 'react-native-url-polyfill/auto';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator,
+  KeyboardAvoidingView, Platform, StyleSheet, StatusBar, Alert, SafeAreaView,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createClient } from '@supabase/supabase-js';
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [main]
+const SUPABASE_URL = 'https://swsxmlgoavjeklccylsc.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_dYFZUkr5IJY9KPiWtShDlg_Exay5I9G';
+const FUNCTION_NAME = 'hyper-function';
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+function AuthScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
+  const submit = async (isSignUp) => {
+    if (!email || !password) return Alert.alert('تنبيه', 'أدخل البريد وكلمة المرور');
+    setLoading(true);
+    const fn = isSignUp ? supabase.auth.signUp : supabase.auth.signInWithPassword;
+    const { data, error } = await fn.call(supabase.auth, { email: email.trim(), password });
+    setLoading(false);
+    if (error) return Alert.alert('خطأ', error.message);
+    if (isSignUp && !data.session) {
+      Alert.alert('تم', 'تحقق من بريدك لتأكيد الحساب ثم سجّل الدخول.');
+    }
+  };
 
-      - name: Create Expo project
-        run: npx create-expo-app@latest app --template blank --yes
-
-      - name: Install dependencies
-        working-directory: app
-        run: |
-          npx expo install @supabase/supabase-js @react-native-async-storage/async-storage react-native-url-polyfill
-
-      - name: Copy app code
-        run: |
-          rm -f app/App.tsx app/App.js
-          cp App.js app/App.js
-
-      - name: Configure Android package
-        working-directory: app
-        run: |
-          node -e "
-          const fs=require('fs');
-          const c=JSON.parse(fs.readFileSync('app.json','utf8'));
-          c.expo.name='المساعد الذكي';
-          c.expo.android=Object.assign({}, c.expo.android, {package:'com.smartchat.app'});
-          fs.writeFileSync('app.json', JSON.stringify(c,null,2));
-          "
-
-      - name: Prebuild Android
-        working-directory: app
-        run: npx expo prebuild --platform android --no-install
-
-      - name: Build release APK
-        working-directory: app/android
-        run: ./gradlew assembleRelease --no-daemon
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-apk
-          path: app/android/app/build/outputs/apk/release/app-release.apk
-          
+  return (
+    <SafeAreaView style={s.container}>
+      <View style={s.authBox}>
+        <Text style={s.title}>المساعد الذكي</Text>
+        <TextInput style={s.input} placeholder="البريد الإلكتروني" placeholderTextColor="#888"
+          autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
+        <TextInput style={s.input} placeholder="كلمة المرور" placeholderTextColor="#888"
+          secureTextEntry value={password} onChangeText={setPassword} />
+        {loading ? <ActivityIndicator color="#4f8cff" /> : (
+          <>
+            <TouchableOpacity style={s.btn} onPress={(
