@@ -1,50 +1,26 @@
-import 'react-native-url-polyfill/auto';
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator,
-  KeyboardAvoidingView, Platform, StyleSheet, StatusBar, Alert, SafeAreaView,
-} from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@supabase/supabase-js';
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator, StatusBar } from 'react-native';
+import { supabase } from './supabase';
+import AuthScreen from './AuthScreen';
+import ChatScreen from './ChatScreen';
+import { s } from './styles';
 
-const SUPABASE_URL = 'https://swsxmlgoavjeklccylsc.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_dYFZUkr5IJY9KPiWtShDlg_Exay5I9G';
-const FUNCTION_NAME = 'hyper-function';
+export default function App() {
+  const [session, setSession] = useState(undefined);
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, sess) => setSession(sess));
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
-function AuthScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (isSignUp) => {
-    if (!email || !password) return Alert.alert('تنبيه', 'أدخل البريد وكلمة المرور');
-    setLoading(true);
-    const fn = isSignUp ? supabase.auth.signUp : supabase.auth.signInWithPassword;
-    const { data, error } = await fn.call(supabase.auth, { email: email.trim(), password });
-    setLoading(false);
-    if (error) return Alert.alert('خطأ', error.message);
-    if (isSignUp && !data.session) {
-      Alert.alert('تم', 'تحقق من بريدك لتأكيد الحساب ثم سجّل الدخول.');
-    }
-  };
-
+  if (session === undefined) {
+    return <View style={[s.container, { justifyContent: 'center' }]}><ActivityIndicator color="#4f8cff" /></View>;
+  }
   return (
-    <SafeAreaView style={s.container}>
-      <View style={s.authBox}>
-        <Text style={s.title}>المساعد الذكي</Text>
-        <TextInput style={s.input} placeholder="البريد الإلكتروني" placeholderTextColor="#888"
-          autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
-        <TextInput style={s.input} placeholder="كلمة المرور" placeholderTextColor="#888"
-          secureTextEntry value={password} onChangeText={setPassword} />
-        {loading ? <ActivityIndicator color="#4f8cff" /> : (
-          <>
-            <TouchableOpacity style={s.btn} onPress={(
+    <>
+      <StatusBar barStyle="light-content" />
+      {session ? <ChatScreen session={session} /> : <AuthScreen />}
+    </>
+  );
+       }
