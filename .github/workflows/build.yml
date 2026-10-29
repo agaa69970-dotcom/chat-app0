@@ -31,7 +31,7 @@ jobs:
       - name: Copy app code
         run: |
           rm -f app/App.tsx app/App.js
-          cp App.js app/App.js
+          cp *.js app/
 
       - name: Configure Android package
         working-directory: app
